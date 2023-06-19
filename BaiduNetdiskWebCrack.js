@@ -5,10 +5,14 @@
 // @grant       unsafeWindow
 // @grant       GM_setValue
 // @grant       GM_getValue
+// @run-at      document-start
 // @connect     pan.baidu.com
-// @require     https://cdn.jsdelivr.net/npm/hls.js@latest
-// @version     1.0
+// @require     https://lib.baomitu.com/hls.js/latest/hls.js
+// @version     1.2
+// @license     MIT
 // @author      Gwen
+// @downloadURL https://greasyfork.org/scripts/468982-%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%A0%B4%E8%A7%A3svip-%E5%80%8D%E9%80%9F%E6%92%AD%E6%94%BE-%E6%96%87%E7%A8%BF%E5%AD%97%E5%B9%95/code/%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%A0%B4%E8%A7%A3SVIP%E5%80%8D%E9%80%9F%E6%92%AD%E6%94%BE%E6%96%87%E7%A8%BF%E5%AD%97%E5%B9%95.user.js
+// @homepageURL https://greasyfork.org/zh-CN/scripts/468982-%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%A0%B4%E8%A7%A3svip-%E5%80%8D%E9%80%9F%E6%92%AD%E6%94%BE-%E6%96%87%E7%A8%BF%E5%AD%97%E5%B9%95
 // @description 百度网盘视频完全破解SVIP。电脑用户使用新版火狐或安插件设置UserAgent:Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:110.0) Gecko/20100101 Firefox/110.0。iPad用户（我iOS15.7）：①使用Safari，在AppStore安装Stay后安装使用脚本。缺点-无Svip快速加载视频。②安装Focus浏览器，登录即为Svip。缺点-Focus无法分屏。
 // ==/UserScript==
 
@@ -20,6 +24,7 @@
     subtitle_enabled: false,
     longPressRate: 2, //长按加速倍速，Safari受设备影响，我的设备最高只能2倍速
     lastPlaybackRate: GM_getValue('lastPlaybackRate', 1),
+    resolution: null,
     failCountThreshold: 15, //视频加载几秒仍未加载插件则手动发送获取视频m3u8的请求
     path: null,
     isSvip: null,
@@ -81,7 +86,7 @@
   //手动请求视频资源
   function fetchVideoM3U8() {
     let xhr = new XMLHttpRequest()
-    let url = `https://pan.baidu.com/api/streaming?app_id=250528&clienttype=0&channel=chunlei&web=1&isplayer=1&check_blue=1&type=M3U8_AUTO_480&trans=&vip=0` +
+    let url = `https://pan.baidu.com/api/streaming?app_id=250528&clienttype=0&channel=chunlei&web=1&isplayer=1&check_blue=1&type=M3U8_AUTO_${settings.resolution?settings.resolution:'480'}&trans=&vip=0` +
           `&bdstoken=${settings.bdstoken||unsafeWindow.locals.bdstoken}&path=${settings.path}&jsToken=${unsafeWindow.jsToken}`
     xhr.open("GET", url)
     xhr.fromScript = true
@@ -417,12 +422,19 @@
         GM_setValue('lastPlaybackRate', selectedSpeed)
       });
       toolBox.appendChild(speedBox)
-      // for (let speed of speeds) {
-      //   toolBox.appendChild(createButton('×' + speed, e => {
-      //     video.playbackRate = speed
-      //     GM_setValue('lastPlaybackRate', speed)
-      //   }))
-      // }
+      let resolutionBox = document.createElement('select')
+      resolutionBox.id = 'resolution-box'
+      resolutionBox.addEventListener('change', event => {
+        const selectedResolution = event.target.value;
+        if (selectedResolution == '1080') {
+          alert('1080无法播放好像。。。')
+          settings.resolution = '720'
+        } else {
+          settings.resolution = selectedResolution;
+        }
+        fetchVideoM3U8()
+      })
+      toolBox.appendChild(resolutionBox)
       //FIX: 修改部分css修复宽度小时无法显示全的问题
       video.parentElement.parentElement.parentElement.appendChild(toolBox)
       document.getElementById('app').style.width = '90%'
@@ -565,7 +577,7 @@
             }
           });
           originOpen.apply(this, arguments);
-        } else if (url.indexOf('/api/loginStatus') != -1 && false) { //伪造svip信息
+        } else if (url.indexOf('/api/loginStatus') != -1) { //伪造svip信息
           this.addEventListener('readystatechange', function() {
             if (this.readyState == 4) {
               let res = JSON.parse(this.responseText)
@@ -637,6 +649,41 @@
               }
             }
           })
+        } else if (url.indexOf('/api/filemetas') != -1) {
+          this.addEventListener('readystatechange', function() {
+            if (this.readyState == 4) {
+              let res = JSON.parse(this.responseText)
+              if (res.info.length != 1)
+                return
+              let resolution = res.info[0].resolution
+              console.log('分辨率'+ resolution)
+              let resolutionOptions = []
+              switch(resolution) {
+                case 'width:1920,height:1080':
+                  resolutionOptions.push('1080')
+                case 'width:1280,height:720':
+                  resolutionOptions.push('720')
+                case 'width:720,height:480':
+                  resolutionOptions.push('480')
+                default:
+                  resolutionOptions.push('360')
+              }
+              console.log(resolutionOptions)
+              let waitTimer = setInterval(() => {
+                let box = document.getElementById('resolution-box')
+                if (box) {
+                  clearInterval(waitTimer)
+                  resolutionOptions.forEach(resolution => {
+                    const option = document.createElement('option')
+                    option.textContent = resolution + 'P'
+                    option.value = resolution
+                    box.appendChild(option)
+                  })
+                }
+              }, 400)
+            }
+          })
+          originOpen.apply(this, arguments);
         } else {
           originOpen.apply(this, arguments);
         }
@@ -685,4 +732,3 @@
     }
   }, 500)
 })()
-
