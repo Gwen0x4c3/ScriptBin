@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        百度网盘破解SVIP&&倍速播放&&文稿字幕
+// @name        百度网盘破解SVIP&&倍速播放&&文稿字幕-dev
 // @namespace   http://tampermonkey.net/
 // @match       https://pan.baidu.com/
 // @match       https://pan.baidu.com/*
@@ -11,7 +11,7 @@
 // @run-at      document-start
 // @connect     pan.baidu.com
 // @require     https://lib.baomitu.com/hls.js/latest/hls.js
-// @version     1.5.1
+// @version     1.5.2
 // @license     MIT
 // @author      Gwen
 // @homepageURL https://greasyfork.org/zh-CN/scripts/468982-%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%A0%B4%E8%A7%A3svip-%E5%80%8D%E9%80%9F%E6%92%AD%E6%94%BE-%E6%96%87%E7%A8%BF%E5%AD%97%E5%B9%95
@@ -55,6 +55,7 @@
     histories: GM_getValue('histories', []),
     pdf: null,
     m3u8url: null,
+    capturePath: null, // 要导出的pdf
     timePoints: null,
     captureHls: null,
   }
@@ -557,7 +558,7 @@
           if (!settings.subtitles) {
             $msg.info('开始加载字幕文件')
             document.querySelector('.vp-video__subtitle-text-first').innerText = '字幕正在加载中...'
-            document.querySelector('.vp-tabs__header-item:nth-child(2)').click();
+            document.querySelector('.vp-tabs__header-item:nth-child(4)').click();
           }
           if (!settings.subtitleAutoEnable && confirm('是否设置自动开启字幕？')) {
             GM_setValue('subtitleAutoEnable', true)
@@ -1306,7 +1307,7 @@
       btn.addEventListener('click', function() {
         if (!settings.subtitles) {
           $msg.info('视频文稿未加载，开始加载...')
-          document.querySelector('.vp-tabs__header-item:nth-child(2)').click();
+          document.querySelector('.vp-tabs__header-item:nth-child(4)').click();
           setTimeout(() => {
             document.querySelector('.vp-tabs__header-item:nth-child(1)').click();
           }, 500)
@@ -1466,7 +1467,7 @@
       setTimeout(() => {
         $msg.info('重新加载字幕')
         settings.subtitles = null
-        document.querySelector('.vp-tabs__header-item:nth-child(2)').click();
+        document.querySelector('.vp-tabs__header-item:nth-child(4)').click();
         setTimeout(() => {
           document.querySelector('.vp-tabs__header-item:nth-child(1)').click();
         }, 500)
@@ -1512,10 +1513,20 @@
         hls.on(Hls.Events.MANIFEST_PARSED, function() {
             video.play();
         });
-
+        
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          // console.log("HLS ERROR");  
+          // console.log(event, data)
+          if (data.fatal && data.type == Hls.ErrorTypes.MEDIA_ERROR) {
+            $msg.error("导出出现异常，尝试恢复")
+            hls.recoverMediaError();
+          }
+        })
+        
         video.oncanplay = function() {
           video.oncanplay = null;
-          $msg.info(`如果没到第${settings.timePoints.length}就停了，重新点击按钮或刷新页面重试`)
+          $msg.info(`如果没到第${settings.timePoints.length}就停了超过10秒没反应，重新点击按钮或刷新页面重试`)
+          $msg.info("导出时尽量不要播放视频")
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
 
@@ -1548,7 +1559,7 @@
             }
             $msg.info("正在导出第" + (index+1) + "张")
             const time = timePoints[index]
-            console.log("导出时间点" + time, timePoints)
+            console.log("导出时间点" + time)
             video.pause();
             video.currentTime = time;
             video.onseeked = function() {
