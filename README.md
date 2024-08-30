@@ -6,7 +6,7 @@
 
 - 百度网盘破解
 
-
+**更新基本在greasyfork，https://greasyfork.org/zh-CN/users/1083392-gwen0x4c3**
 
 ## 百度网盘破解Svip
 
