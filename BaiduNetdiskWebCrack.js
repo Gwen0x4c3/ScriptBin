@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        百度网盘破解SVIP&&倍速播放&&文稿字幕-dev
+// @name        百度网盘破解SVIP&&倍速播放&&文稿字幕
 // @namespace   http://tampermonkey.net/
 // @match       https://pan.baidu.com/
 // @match       https://pan.baidu.com/*
@@ -11,11 +11,11 @@
 // @run-at      document-start
 // @connect     pan.baidu.com
 // @require     https://lib.baomitu.com/hls.js/latest/hls.js
-// @version     1.5.2
+// @version     1.5.4
 // @license     MIT
 // @author      Gwen
 // @homepageURL https://greasyfork.org/zh-CN/scripts/468982-%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%A0%B4%E8%A7%A3svip-%E5%80%8D%E9%80%9F%E6%92%AD%E6%94%BE-%E6%96%87%E7%A8%BF%E5%AD%97%E5%B9%95
-// @description 百度网盘视频完全破解SVIP。电脑用户使用新版火狐或安插件设置UserAgent:Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:110.0) Gecko/20100101 Firefox/110.0。iPad用户（我iOS15.7）：①使用Safari，在AppStore安装Stay后安装使用脚本。缺点-无Svip快速加载视频。②安装Focus浏览器，登录即为Svip。缺点-Focus无法分屏。
+// @description 百度网盘视频完全破解SVIP。电脑用户使用新版火狐或安插件设置UserAgent:Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:110.0) Gecko/20100101 Firefox/110.0。iPad用户（我iOS15.7）：安装Focus浏览器，安装插件，登录即为Svip。
 // @downloadURL https://update.greasyfork.org/scripts/468982/%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%A0%B4%E8%A7%A3SVIP%E5%80%8D%E9%80%9F%E6%92%AD%E6%94%BE%E6%96%87%E7%A8%BF%E5%AD%97%E5%B9%95.user.js
 // @updateURL https://update.greasyfork.org/scripts/468982/%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%A0%B4%E8%A7%A3SVIP%E5%80%8D%E9%80%9F%E6%92%AD%E6%94%BE%E6%96%87%E7%A8%BF%E5%AD%97%E5%B9%95.meta.js
 // ==/UserScript==
@@ -120,6 +120,16 @@
       alert(`Error parsing stored value for key '${key}': ${error}`);
       return defaultValue;
     }
+  }
+  function createElement(tag, clazz, attrs) {
+    const elem = document.createElement(tag);
+    elem.className = clazz;
+    if (attrs) {
+      for (let key in attrs) {
+        elem[key] = attrs[key];
+      }
+    }
+    return elem;
   }
   function throttle(fn, delay) {
     var ctx;
@@ -613,8 +623,8 @@
       })
       toolBox.appendChild(resolutionBox)
       //导出课件
-      let exportPdfBtn = createButton('导出课件', exportPdf1)
-      toolBox.appendChild(exportPdfBtn)
+      // let exportPdfBtn = createButton('导出课件', exportPdf1)
+      // toolBox.appendChild(exportPdfBtn)
       video.parentElement.parentElement.parentElement.appendChild(toolBox)
       initDraftExport()
       if (settings.subtitleAutoEnable) {
@@ -1063,7 +1073,7 @@
                   settings.lastCurrentTime = settings.globalVideo ? settings.globalVideo.currentTime : 0
                   let xhr = new XMLHttpRequest()
                   let url = `https://pan.baidu.com/api/streaming?app_id=250528&clienttype=0&channel=chunlei&web=1&isplayer=1&check_blue=1&type=M3U8_AUTO_${settings.resolution?settings.resolution:'480'}&trans=&vip=0` +
-                        `&bdstoken=${settings.bdstoken||unsafeWindow.locals.bdstoken}&path=${settings.path}&jsToken=${unsafeWindow.jsToken}`
+                        `&bdstoken=${settings.bdstoken||unsafeWindow.locals.bdstoken}&path=${encodeURIComponent(settings.path)}&jsToken=${unsafeWindow.jsToken}`
                   xhr.open("GET", url, false)
                   xhr.send()
                   this.responseText = xhr.responseText.replace(/https.*?\//, 'https://nv0.baidupcs.com/')
@@ -1171,14 +1181,15 @@
                 }
               }
               console.log(timePoints)
-              settings.timePoints = timePoints
+              settings.timePoints = timePoints;
+              showPdf();
             }
           })
           originOpen.apply(this, arguments);
         } else {
           originOpen.apply(this, arguments);
         }
-        
+
         /*
         else if (url.indexOf('/ppt/common') != -1) { // 查询ppt生成情况接口
           this.addEventListener('readystatechange', function() {
@@ -1370,65 +1381,6 @@
       $msg.success('导出成功')
     })
   }
-  
-  function exportPdf() {
-    document.querySelector('.vp-tabs__header').children[2].click()
-    let doExport = () => {
-      let container = document.querySelector('.ai-course__apply-wrap-course-container')
-      if (!container) {
-        console.log('课件加载中...')
-        setTimeout(doExport, 100)
-      } else {
-        container = document.querySelector('.ai-course__wrap')
-        console.log('已发现课件')
-        let imgs = container.querySelectorAll('img')
-        let sh = imgs[0].height
-        //控制滚动到底部，加载所有图片
-        var scrollDistance = container.scrollHeight - container.clientHeight;
-        // container.scrollTo(0, scrollDistance);
-        let dist = 0
-        let scrollInterval = setInterval(() => {
-          if (dist < scrollDistance) {
-            container.scrollTo(0, dist);
-            dist += sh
-            return 
-          }
-          clearInterval(scrollInterval)
-          if (!confirm('课件图片是否已全部加载？等全部加载后才可正常导出所有图片，不确定就点取消，自己拖着滚动条从上到下滚动一下')) {
-            return
-          }
-          let quality = parseFloat(prompt('输入图像质量(0~1)，一般输入1，嫌文件太大就自己调整'))
-          if (!imgs.length || imgs.length == 0) {
-              alert('未发现图像')
-              return
-          }
-          let w = imgs[0].naturalWidth, h = imgs[0].naturalHeight
-          let pdf = new jspdf.jsPDF('l', 'px', [w, h]);
-          for (let i = 0; i < imgs.length; i++) {
-              let img = imgs[i]
-              let can = document.createElement('canvas')
-              can.width = img.naturalWidth
-              can.height = img.naturalHeight
-              can.getContext("2d").drawImage(img, 0, 0);
-              let canvasBase64 = can.toDataURL('image/jpeg', quality);
-              pdf.addImage(canvasBase64, 'JPEG', 0, 0, w, h)
-              pdf.addPage([img.naturalWidth, img.naturalHeight], 'l')
-          }
-          const targetPage = pdf.internal.getNumberOfPages()
-          pdf.deletePage(targetPage)
-          pdf.save(document.querySelector('.vp-personal-home-layout__video > .vp-toolsbar > .vp-toolsbar__title').title + '.pdf')
-        }, 50)
-      }
-    }
-    if (!unsafeWindow.jspdf) {
-      let script = document.createElement('script')
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.1.1/jspdf.umd.min.js'
-      document.head.appendChild(script)
-      script.onload = doExport
-    } else {
-      doExport()
-    }
-  }
 
   hookRequest()
   init()
@@ -1475,27 +1427,73 @@
 
     }
   }, 500)
-  
-  function exportPdf1() {
+
+  function showPdf() {
     document.querySelector('.vp-tabs__header').children[2].click()
-    const doExport = () => {
+    const doShow = () => {
       if (!settings.timePoints || settings.timePoints.length == 0) {
         console.log("正在加载课件时间点...");
-        setTimeout(doExport, 500);
+        setTimeout(doShow, 500);
       } else {
-        $msg.info(`开始导出pdf，共${settings.timePoints.length}张`)
         const video = document.createElement('video');
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
+        let aiCourse = document.querySelector(".vp-ai-course")
+        let aiCourseTools = null;
+        let logText = null;
+        let reloadBtn = null;
+        let exportBtn = null;
         let imageContainer = document.getElementById("export-image-container")
+        // if (aiCourse && !aiCourse.querySelector('.vp-ai-course-tools')) {
+        if (aiCourse) {
+          aiCourse.innerHTML = ''
+          aiCourseTools = createElement('div', 'vp-ai-course-tools', {style:'margin-bottom:5px;'})
+          logText = createElement('span', '', {style:'margin-right:10px;font-size:16px;'})
+          reloadBtn = createElement('button', '', {innerText: '重新加载', disabled: true, style: 'margin-right:10px;padding: 3px 10px;font-size: 14px;background:#fff;border:1px solid #ccc;cursor:pointer;'});
+          exportBtn = createElement('button', '', {innerText: '导出', disabled: true, style: 'padding: 3px 10px;font-size: 14px;background:#fff;border:1px solid #ccc;cursor:pointer;'});
+          reloadBtn.onclick = () => {
+            if (!reloadBtn.disabled) {
+              showPdf();
+            }
+          }
+          let exportLock = false;
+          exportBtn.onclick = () => {
+            if (!exportBtn.disabled && !exportLock) {
+              exportLock = true;
+              $msg.info("正在写入pdf")
+              if (settings.captureHls)
+                settings.captureHls.destroy();
+              settings.captureHls = null;
+              // 导出pdf
+              const imgs = imageContainer.querySelectorAll('img')
+              let w = imgs[0].naturalWidth, h = imgs[0].naturalHeight
+              let pdf = new jspdf.jsPDF('l', 'px', [w, h]);
+              for (let i = 0; i < imgs.length; i++) {
+                  let img = imgs[i]
+                  pdf.addImage(img.src, 'JPEG', 0, 0, w, h)
+                  pdf.addPage([img.naturalWidth, img.naturalHeight], 'l')
+              }
+              const targetPage = pdf.internal.getNumberOfPages()
+              pdf.deletePage(targetPage)
+              pdf.save(document.querySelector('.vp-personal-home-layout__video > .vp-toolsbar > .vp-toolsbar__title').title + '.pdf')
+              $msg.success("导出成功")
+              settings.timePoints = []
+              exportLock = false;
+            }
+          }
+          aiCourseTools.appendChild(logText)
+          aiCourseTools.appendChild(reloadBtn)
+          aiCourseTools.appendChild(exportBtn)
+          aiCourse.append(aiCourseTools);
+        }
         if (!imageContainer) {
           imageContainer = document.createElement('div')
           imageContainer.id = "export-image-container"
-          // imageContainer.style.display = 'none'
-          // document.body.append(imageContainer)
+          imageContainer.style.overflowY = 'auto'
         } else {
           imageContainer.innerHTML = ''
         }
+        aiCourse.appendChild(imageContainer)
 
         //const hls = new Hls();
         if (settings.captureHls) {
@@ -1513,63 +1511,55 @@
         hls.on(Hls.Events.MANIFEST_PARSED, function() {
             video.play();
         });
-        
+
         hls.on(Hls.Events.ERROR, function (event, data) {
-          // console.log("HLS ERROR");  
+          // console.log("HLS ERROR");
           // console.log(event, data)
           if (data.fatal && data.type == Hls.ErrorTypes.MEDIA_ERROR) {
             $msg.error("导出出现异常，尝试恢复")
             hls.recoverMediaError();
+            logText.innerHTML = '<span style="color:red">导出出现异常，尝试恢复</span>'
+          } else if (data.fatal) {
+            $msg.error("导出失败，请重试")
+            logText.innerHTML = '<span style="color:red">导出失败，请重试</span>'
+            reloadBtn.disabled = false;
           }
         })
-        
+
         video.oncanplay = function() {
           video.oncanplay = null;
-          $msg.info(`如果没到第${settings.timePoints.length}就停了超过10秒没反应，重新点击按钮或刷新页面重试`)
-          $msg.info("导出时尽量不要播放视频")
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
-
           function captureScreenshot(timePoints, index) {
             if (index >= timePoints.length) {
-              $msg.success("导出完成，正在写入pdf")
-              // 将图片展示在那个地方
-              let aiCourse = document.querySelector(".vp-ai-course")
-              aiCourse.innerHTML = ''
-              aiCourse.appendChild(imageContainer)
-              imageContainer.style.overflowY = 'auto'
               // 销毁视频对象
               settings.captureHls.destroy();
               settings.captureHls = null;
-              // 导出pdf
-              const imgs = imageContainer.children
-              let w = imgs[0].naturalWidth, h = imgs[0].naturalHeight
-              let pdf = new jspdf.jsPDF('l', 'px', [w, h]);
-              for (let i = 0; i < imgs.length; i++) {
-                  let img = imgs[i]
-                  pdf.addImage(img.src, 'JPEG', 0, 0, w, h)
-                  pdf.addPage([img.naturalWidth, img.naturalHeight], 'l')
-              }
-              const targetPage = pdf.internal.getNumberOfPages()
-              pdf.deletePage(targetPage)
-              pdf.save(document.querySelector('.vp-personal-home-layout__video > .vp-toolsbar > .vp-toolsbar__title').title + '.pdf')
-              $msg.success("生成成功")
-              settings.timePoints = []
+              logText.innerHTML = '加载完成';
+              reloadBtn.disabled = false;
+              exportBtn.disabled = false;
               return;
             }
-            $msg.info("正在导出第" + (index+1) + "张")
+            logText.innerHTML = `加载中(${index+1}/${timePoints.length})`
             const time = timePoints[index]
-            console.log("导出时间点" + time)
             video.pause();
             video.currentTime = time;
             video.onseeked = function() {
               video.onseeked = null;
               context.drawImage(video, 0, 0, canvas.width, canvas.height);
               const imgDataUrl = canvas.toDataURL('image/jpeg', 1);
-              const img = document.createElement('img');
-              img.src = imgDataUrl;
-              img.style.width = '100%';
-              imageContainer.appendChild(img);
+              const imgWrapper = createElement('div', '', {style:'position:relative;width:100%;height:fit-content;'})
+              const img = createElement('img', '', {src: imgDataUrl, style: 'width:100%;'});
+              imgWrapper.append(img)
+              imageContainer.appendChild(imgWrapper);
+              imgWrapper.addEventListener('mouseenter', () => {
+                const imgOverlay = createElement('div', 'img-index-text', {textContent:`${index+1}/${timePoints.length}`, style: "font-size:13px;position:absolute;top:0;left:0;background:black;color:white;padding:5px;border-radius:5px;"});
+                imgWrapper.appendChild(imgOverlay);
+              });
+              imgWrapper.addEventListener('mouseleave', () => {
+                const imgOverlay = imgWrapper.querySelector('.img-index-text');
+                imgWrapper.removeChild(imgOverlay);
+              });
               captureScreenshot(timePoints, index+1)
             };
           }
@@ -1582,10 +1572,11 @@
       let script = document.createElement('script')
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.1.1/jspdf.umd.min.js'
       document.head.appendChild(script)
-      script.onload = doExport
+      script.onload = doShow
+      $msg.info("正在引入pdf所需js依赖")
     } else {
-      doExport()
+      doShow()
     }
   }
-  
+
 })()
